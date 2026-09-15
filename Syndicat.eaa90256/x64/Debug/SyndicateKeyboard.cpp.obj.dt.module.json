@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "Syndicat.eaa90256\\x64\\Debug\\SyndicateKeyboard.obj",
+            "outputs": [
+                "Syndicat.eaa90256\\x64\\Debug\\SyndicateKeyboard.cpp.obj.dt.module.json",
+                "Syndicat.eaa90256\\x64\\Debug\\SyndicateKeyboard.cpp.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}
