@@ -32,6 +32,8 @@ private:
     void OnMouseLeave();
 
     void RecalculateLayoutGeometry();
+    void KeepWindowOnScreen(int winW = 0, int winH = 0);
+    void ShowLayoutDropdown();
     int HitTestKey(int x, int y);
     bool HitTestHeader(int x, int y);
 
@@ -42,6 +44,7 @@ private:
     std::vector<LanguageLayout> m_layouts;
     size_t m_activeLayoutIndex;
 
+    bool m_startMinimized;
     bool m_shiftActive;
     bool m_trackingMouse;
     int m_hoveredKeyIndex;
@@ -49,12 +52,15 @@ private:
 
     // Header buttons hit test & states
     RECT m_rcHeader;
+    RECT m_rcTitleBtn;
     RECT m_rcShiftBtn;
-    RECT m_rcMinBtn;
-    RECT m_rcCloseBtn;
+    RECT m_rcXBtn;
 
-    int m_hoveredHeaderBtn; // 0 = none, 1 = Shift, 2 = Min, 3 = Close
+    int m_hoveredHeaderBtn; // 0 = none, 1 = Shift, 2 = X, 4 = Title Dropdown
     int m_pressedHeaderBtn;
+
+
+    UINT m_wmTaskbarCreated;
 
     // Key rectangles in window coordinates
     std::vector<RECT> m_keyRects;

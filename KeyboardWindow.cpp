@@ -1,5 +1,6 @@
 #include "KeyboardWindow.h"
 #include "InputSender.h"
+#include "Settings.h"
 #include <algorithm>
 
 static const wchar_t* WINDOW_CLASS_NAME = L"SyndicateSoftKeyboardWindow";
@@ -8,6 +9,7 @@ KeyboardWindow::KeyboardWindow()
     : m_hWnd(nullptr),
       m_hInstance(nullptr),
       m_activeLayoutIndex(0),
+      m_startMinimized(false),
       m_shiftActive(false),
       m_trackingMouse(false),
       m_hoveredKeyIndex(-1),
@@ -18,15 +20,20 @@ KeyboardWindow::KeyboardWindow()
       m_hFontTitle(nullptr),
       m_hFontKey(nullptr),
       m_hFontHint(nullptr),
-      m_hFontSmallBtn(nullptr) {
+      m_hFontSmallBtn(nullptr),
+      m_wmTaskbarCreated(0) {
     m_layouts = GetSupportedLayouts();
+    m_startMinimized = Settings::LoadStartMinimized();
     ZeroMemory(&m_rcHeader, sizeof(m_rcHeader));
+    ZeroMemory(&m_rcTitleBtn, sizeof(m_rcTitleBtn));
     ZeroMemory(&m_rcShiftBtn, sizeof(m_rcShiftBtn));
-    ZeroMemory(&m_rcMinBtn, sizeof(m_rcMinBtn));
-    ZeroMemory(&m_rcCloseBtn, sizeof(m_rcCloseBtn));
+    ZeroMemory(&m_rcXBtn, sizeof(m_rcXBtn));
+
     ZeroMemory(&m_dragStartCursor, sizeof(m_dragStartCursor));
     ZeroMemory(&m_dragStartWindowRect, sizeof(m_dragStartWindowRect));
+    m_wmTaskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
 }
+
 
 KeyboardWindow::~KeyboardWindow() {
     m_trayIcon.Remove();
@@ -101,9 +108,18 @@ bool KeyboardWindow::Create(HINSTANCE hInstance, int nCmdShow) {
     // Initialize System Tray Icon
     m_trayIcon.Initialize(m_hWnd, hInstance);
 
-    // Show window without taking focus
-    ShowWindow(m_hWnd, SW_SHOWNOACTIVATE);
-    UpdateWindow(m_hWnd);
+    HICON hIcon = m_trayIcon.GetIcon();
+    if (hIcon) {
+        SendMessageW(m_hWnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+        SendMessageW(m_hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    }
+
+    if (m_startMinimized) {
+        ShowWindow(m_hWnd, SW_HIDE);
+    } else {
+        ShowWindow(m_hWnd, SW_SHOWNOACTIVATE);
+        UpdateWindow(m_hWnd);
+    }
 
     return true;
 }
@@ -126,54 +142,131 @@ void KeyboardWindow::RecalculateLayoutGeometry() {
     int cols = 4;
     int rows = 1;
 
-    if (keyCount <= 5) {
+    if (layout.preferredCols > 0) {
+        cols = layout.preferredCols;
+        rows = static_cast<int>((keyCount + cols - 1) / cols);
+    } else if (keyCount <= 5) {
         cols = static_cast<int>(keyCount);
         rows = 1;
     } else {
-        cols = (static_cast<int>(keyCount) + 1) / 2;
-        rows = 2;
+        cols = 5;
+        rows = static_cast<int>((keyCount + 4) / 5);
     }
 
-    int winW = padX * 2 + cols * keyW + (cols - 1) * keyGap;
+    int maxRowKeys = cols;
+    int maxRowW = maxRowKeys * keyW + (maxRowKeys - 1) * keyGap;
+    int winW = padX * 2 + maxRowW;
     int winH = headerH + padY * 2 + rows * keyH + (rows - 1) * keyGap;
 
-    // Minimum width for header controls (Title + Shift + Min + Close)
-    if (winW < 260) {
-        winW = 260;
+
+    // Minimum width for header controls (Title dropdown + Shift + X)
+    if (winW < 240) {
+        winW = 240;
     }
 
-    m_rcHeader = { 0, 0, winW, headerH };
-    m_rcCloseBtn = { winW - 28, 5, winW - 6, 27 };
-    m_rcMinBtn   = { winW - 54, 5, winW - 32, 27 };
-    m_rcShiftBtn = { winW - 108, 5, winW - 58, 27 };
+    // Measure Title text to size the dropdown pill button properly
+    int titleW = 92;
+    if (m_hFontTitle && m_hWnd) {
+        HDC hdc = GetDC(m_hWnd);
+        if (hdc) {
+            HFONT hOld = (HFONT)SelectObject(hdc, m_hFontTitle);
+            std::wstring titleText = layout.name + L"  \u25BE";
+            RECT rcMeasure = { 0, 0, 0, 0 };
+            DrawTextW(hdc, titleText.c_str(), -1, &rcMeasure, DT_CALCRECT | DT_SINGLELINE);
+            SelectObject(hdc, hOld);
+            ReleaseDC(m_hWnd, hdc);
+            int measured = (rcMeasure.right - rcMeasure.left) + 20;
+            if (measured > titleW) titleW = measured;
+        }
+    }
 
-    // Calculate each key rectangle
+    m_rcHeader   = { 0, 0, winW, headerH };
+    m_rcTitleBtn = { 8, 4, 8 + titleW, 28 };
+    m_rcXBtn     = { winW - 32, 5, winW - 8, 27 };  // width 24, height 22
+    m_rcShiftBtn = { winW - 92, 5, winW - 38, 27 }; // width 54, height 22
+
+    // Calculate each key rectangle, centering keys in each row
     m_keyRects.clear();
     int startY = headerH + padY;
 
-    // Center keys horizontally if winW is larger
-    int keysBlockW = cols * keyW + (cols - 1) * keyGap;
-    int startX = (winW - keysBlockW) / 2;
+    for (int r = 0; r < rows; ++r) {
+        int keysInThisRow = (r < rows - 1) ? cols : (static_cast<int>(keyCount) - r * cols);
+        int rowW = keysInThisRow * keyW + (keysInThisRow - 1) * keyGap;
+        int rowStartX = (winW - rowW) / 2;
 
-    for (size_t i = 0; i < keyCount; ++i) {
-        int r = static_cast<int>(i / cols);
-        int c = static_cast<int>(i % cols);
+        for (int c = 0; c < keysInThisRow; ++c) {
+            int kx = rowStartX + c * (keyW + keyGap);
+            int ky = startY + r * (keyH + keyGap);
 
-        int kx = startX + c * (keyW + keyGap);
-        int ky = startY + r * (keyH + keyGap);
-
-        RECT rk = { kx, ky, kx + keyW, ky + keyH };
-        m_keyRects.push_back(rk);
+            RECT rk = { kx, ky, kx + keyW, ky + keyH };
+            m_keyRects.push_back(rk);
+        }
     }
 
     if (m_hWnd) {
-        SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, winW, winH, SWP_NOMOVE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        KeepWindowOnScreen(winW, winH);
 
         // Apply smooth rounded window shape
         HRGN hRgn = CreateRoundRectRgn(0, 0, winW + 1, winH + 1, 10, 10);
         SetWindowRgn(m_hWnd, hRgn, TRUE);
         InvalidateRect(m_hWnd, NULL, FALSE);
     }
+}
+
+void KeyboardWindow::KeepWindowOnScreen(int winW, int winH) {
+    if (!m_hWnd) {
+        return;
+    }
+
+    RECT wndRc = {};
+    GetWindowRect(m_hWnd, &wndRc);
+
+    if (winW <= 0) {
+        winW = wndRc.right - wndRc.left;
+    }
+    if (winH <= 0) {
+        winH = wndRc.bottom - wndRc.top;
+    }
+
+    HMONITOR hMon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi = {};
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoW(hMon, &mi)) {
+        SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, winW, winH,
+            SWP_NOMOVE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        return;
+    }
+
+    const RECT& work = mi.rcWork;
+    const int workW = work.right - work.left;
+    const int workH = work.bottom - work.top;
+
+    int x = wndRc.left;
+    int y = wndRc.top;
+
+    if (winW >= workW) {
+        x = work.left;
+    } else {
+        if (x + winW > work.right) {
+            x = work.right - winW;
+        }
+        if (x < work.left) {
+            x = work.left;
+        }
+    }
+
+    if (winH >= workH) {
+        y = work.top;
+    } else {
+        if (y + winH > work.bottom) {
+            y = work.bottom - winH;
+        }
+        if (y < work.top) {
+            y = work.top;
+        }
+    }
+
+    SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, winW, winH, SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 
 void KeyboardWindow::SetLayout(size_t layoutIndex) {
@@ -189,6 +282,7 @@ void KeyboardWindow::ToggleVisibility() {
     if (IsVisible()) {
         ShowWindow(m_hWnd, SW_HIDE);
     } else {
+        KeepWindowOnScreen();
         ShowWindow(m_hWnd, SW_SHOWNOACTIVATE);
     }
 }
@@ -249,9 +343,22 @@ LRESULT KeyboardWindow::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
         OnMouseLeave();
         return 0;
 
+    case WM_SETCURSOR: {
+        POINT pt;
+        GetCursorPos(&pt);
+        ScreenToClient(m_hWnd, &pt);
+        if (PtInRect(&m_rcTitleBtn, pt) || PtInRect(&m_rcShiftBtn, pt) || PtInRect(&m_rcXBtn, pt) || HitTestKey(pt.x, pt.y) >= 0) {
+            SetCursor(LoadCursor(NULL, IDC_HAND));
+            return TRUE;
+        }
+        SetCursor(LoadCursor(NULL, IDC_ARROW));
+        return TRUE;
+    }
+
+
     case WM_APP_TRAY:
         if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
-            m_trayIcon.ShowContextMenu(m_hWnd, m_layouts, m_activeLayoutIndex, IsVisible());
+            m_trayIcon.ShowContextMenu(m_hWnd, m_layouts, m_activeLayoutIndex, IsVisible(), m_startMinimized);
         } else if (lParam == WM_LBUTTONUP || lParam == WM_LBUTTONDBLCLK) {
             ToggleVisibility();
         }
@@ -260,9 +367,13 @@ LRESULT KeyboardWindow::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
     case WM_COMMAND: {
         WORD id = LOWORD(wParam);
         if (id == IDM_TRAY_SHOW) {
+            KeepWindowOnScreen();
             ShowWindow(m_hWnd, SW_SHOWNOACTIVATE);
         } else if (id == IDM_TRAY_HIDE) {
             ShowWindow(m_hWnd, SW_HIDE);
+        } else if (id == IDM_TRAY_START_MINIMIZED) {
+            m_startMinimized = !m_startMinimized;
+            Settings::SaveStartMinimized(m_startMinimized);
         } else if (id == IDM_TRAY_EXIT) {
             DestroyWindow(m_hWnd);
         } else if (id >= IDM_TRAY_LAYOUT_BASE && id < IDM_TRAY_LAYOUT_BASE + m_layouts.size()) {
@@ -271,12 +382,20 @@ LRESULT KeyboardWindow::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
         return 0;
     }
 
+    case WM_DISPLAYCHANGE:
+        KeepWindowOnScreen();
+        return 0;
+
     case WM_DESTROY:
         m_trayIcon.Remove();
         PostQuitMessage(0);
         return 0;
 
     default:
+        if (msg == m_wmTaskbarCreated) {
+            m_trayIcon.ReAdd();
+            return 0;
+        }
         return DefWindowProcW(m_hWnd, msg, wParam, lParam);
     }
 }
@@ -294,14 +413,53 @@ int KeyboardWindow::HitTestKey(int x, int y) {
 bool KeyboardWindow::HitTestHeader(int x, int y) {
     POINT pt = { x, y };
     if (!PtInRect(&m_rcHeader, pt)) return false;
+    if (PtInRect(&m_rcTitleBtn, pt)) return false;
     if (PtInRect(&m_rcShiftBtn, pt)) return false;
-    if (PtInRect(&m_rcMinBtn, pt)) return false;
-    if (PtInRect(&m_rcCloseBtn, pt)) return false;
+    if (PtInRect(&m_rcXBtn, pt)) return false;
     return true;
+}
+
+#define IDM_DROPDOWN_LAYOUT_BASE 3000
+
+void KeyboardWindow::ShowLayoutDropdown() {
+    POINT pt = { m_rcTitleBtn.left, m_rcHeader.bottom };
+    ClientToScreen(m_hWnd, &pt);
+
+    HMENU hMenu = CreatePopupMenu();
+    if (!hMenu) return;
+
+    for (size_t i = 0; i < m_layouts.size(); ++i) {
+        UINT flags = MF_STRING;
+        if (i == m_activeLayoutIndex) {
+            flags |= MF_CHECKED;
+        }
+        AppendMenuW(hMenu, flags, IDM_DROPDOWN_LAYOUT_BASE + i, m_layouts[i].name.c_str());
+    }
+
+
+    SetForegroundWindow(m_hWnd);
+    int cmd = TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, pt.x, pt.y, 0, m_hWnd, NULL);
+    DestroyMenu(hMenu);
+
+    m_pressedHeaderBtn = 0;
+    m_hoveredHeaderBtn = 0;
+
+    if (cmd >= IDM_DROPDOWN_LAYOUT_BASE && cmd < IDM_DROPDOWN_LAYOUT_BASE + static_cast<int>(m_layouts.size())) {
+        SetLayout(cmd - IDM_DROPDOWN_LAYOUT_BASE);
+    } else {
+        InvalidateRect(m_hWnd, &m_rcTitleBtn, FALSE);
+    }
 }
 
 void KeyboardWindow::OnLButtonDown(int x, int y) {
     POINT pt = { x, y };
+
+    if (PtInRect(&m_rcTitleBtn, pt)) {
+        m_pressedHeaderBtn = 4;
+        InvalidateRect(m_hWnd, &m_rcTitleBtn, FALSE);
+        ShowLayoutDropdown();
+        return;
+    }
 
     if (HitTestHeader(x, y)) {
         // Dragging soft keyboard anywhere across screen without losing target app focus
@@ -319,15 +477,9 @@ void KeyboardWindow::OnLButtonDown(int x, int y) {
         return;
     }
 
-    if (PtInRect(&m_rcMinBtn, pt)) {
+    if (PtInRect(&m_rcXBtn, pt)) {
         m_pressedHeaderBtn = 2;
-        InvalidateRect(m_hWnd, &m_rcMinBtn, FALSE);
-        return;
-    }
-
-    if (PtInRect(&m_rcCloseBtn, pt)) {
-        m_pressedHeaderBtn = 3;
-        InvalidateRect(m_hWnd, &m_rcCloseBtn, FALSE);
+        InvalidateRect(m_hWnd, &m_rcXBtn, FALSE);
         return;
     }
 
@@ -351,12 +503,13 @@ void KeyboardWindow::OnLButtonUp(int x, int y) {
     if (m_isDragging) {
         m_isDragging = false;
         ReleaseCapture();
+        KeepWindowOnScreen();
     }
 
-    if (m_pressedHeaderBtn == 2 && PtInRect(&m_rcMinBtn, pt)) {
+    if (m_pressedHeaderBtn == 2 && PtInRect(&m_rcXBtn, pt)) {
+        // X button minimizes to system tray
         ShowWindow(m_hWnd, SW_HIDE);
-    } else if (m_pressedHeaderBtn == 3 && PtInRect(&m_rcCloseBtn, pt)) {
-        DestroyWindow(m_hWnd);
+        m_trayIcon.ShowBalloon(L"Syndicate Keyboard", L"Keyboard minimized to tray. Click the icon to restore, or right-click to exit.");
     }
     m_pressedHeaderBtn = 0;
 
@@ -405,8 +558,8 @@ void KeyboardWindow::OnMouseMove(int x, int y) {
     int newHoveredHeaderBtn = 0;
 
     if (PtInRect(&m_rcShiftBtn, pt)) newHoveredHeaderBtn = 1;
-    else if (PtInRect(&m_rcMinBtn, pt)) newHoveredHeaderBtn = 2;
-    else if (PtInRect(&m_rcCloseBtn, pt)) newHoveredHeaderBtn = 3;
+    else if (PtInRect(&m_rcXBtn, pt)) newHoveredHeaderBtn = 2;
+    else if (PtInRect(&m_rcTitleBtn, pt)) newHoveredHeaderBtn = 4;
 
     if (newHoveredKey != m_hoveredKeyIndex || newHoveredHeaderBtn != m_hoveredHeaderBtn) {
         m_hoveredKeyIndex = newHoveredKey;
@@ -472,12 +625,20 @@ void KeyboardWindow::OnPaint() {
     SelectObject(memDC, oldPen);
     DeleteObject(hDividerPen);
 
-    // 1. Draw Title: Language Name (e.g. "German")
+    // 1. Draw Title Dropdown Button
+    bool isTitleHovered = (m_hoveredHeaderBtn == 4);
+    bool isTitlePressed = (m_pressedHeaderBtn == 4);
+    COLORREF titleBg = isTitlePressed ? RGB(88, 101, 242) : (isTitleHovered ? RGB(55, 58, 64) : RGB(38, 40, 44));
+    COLORREF titleBorder = isTitleHovered ? RGB(88, 101, 242) : RGB(60, 63, 70);
+    COLORREF titleTextCol = (isTitlePressed || isTitleHovered) ? RGB(255, 255, 255) : RGB(225, 228, 234);
+    DrawRoundedBox(memDC, m_rcTitleBtn, titleBg, titleBorder, 4);
+
     SelectObject(memDC, m_hFontTitle);
-    SetTextColor(memDC, RGB(242, 243, 245));
-    RECT titleRc = { 12, 0, m_rcShiftBtn.left - 4, m_rcHeader.bottom };
+    SetTextColor(memDC, titleTextCol);
     const auto& activeLayout = m_layouts[m_activeLayoutIndex];
-    DrawTextW(memDC, activeLayout.name.c_str(), -1, &titleRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    std::wstring titleText = activeLayout.name + L"  \u25BE";
+    DrawTextW(memDC, titleText.c_str(), -1, &m_rcTitleBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
 
     // 2. Draw Shift Button
     COLORREF shiftBg = m_shiftActive ? RGB(88, 101, 242) : (m_hoveredHeaderBtn == 1 ? RGB(60, 63, 69) : RGB(49, 51, 56));
@@ -490,24 +651,17 @@ void KeyboardWindow::OnPaint() {
     RECT shiftTextRc = m_rcShiftBtn;
     DrawTextW(memDC, L"SHIFT", -1, &shiftTextRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    // 3. Draw Minimize Button [–]
-    COLORREF minBg = (m_hoveredHeaderBtn == 2) ? RGB(60, 63, 69) : RGB(49, 51, 56);
-    COLORREF minBorder = RGB(70, 73, 80);
-    DrawRoundedBox(memDC, m_rcMinBtn, minBg, minBorder, 4);
+    // 3. Draw Minimize-to-Tray 'X' Button
+    COLORREF xBg = (m_hoveredHeaderBtn == 2) ? RGB(218, 55, 60) : RGB(49, 51, 56);
+    COLORREF xBorder = (m_hoveredHeaderBtn == 2) ? RGB(237, 66, 69) : RGB(70, 73, 80);
+    COLORREF xText = (m_hoveredHeaderBtn == 2) ? RGB(255, 255, 255) : RGB(200, 204, 210);
+    DrawRoundedBox(memDC, m_rcXBtn, xBg, xBorder, 4);
 
     SelectObject(memDC, m_hFontSmallBtn);
-    SetTextColor(memDC, RGB(200, 204, 210));
-    RECT minTextRc = m_rcMinBtn;
-    DrawTextW(memDC, L"–", -1, &minTextRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    SetTextColor(memDC, xText);
+    RECT xTextRc = m_rcXBtn;
+    DrawTextW(memDC, L"X", -1, &xTextRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    // 4. Draw Close Button [✕]
-    COLORREF closeBg = (m_hoveredHeaderBtn == 3) ? RGB(237, 66, 69) : RGB(49, 51, 56);
-    COLORREF closeBorder = (m_hoveredHeaderBtn == 3) ? RGB(237, 66, 69) : RGB(70, 73, 80);
-    COLORREF closeText = (m_hoveredHeaderBtn == 3) ? RGB(255, 255, 255) : RGB(200, 204, 210);
-    DrawRoundedBox(memDC, m_rcCloseBtn, closeBg, closeBorder, 4);
-
-    RECT closeTextRc = m_rcCloseBtn;
-    DrawTextW(memDC, L"✕", -1, &closeTextRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     // 5. Draw Keys
     bool isShift = m_shiftActive || ((GetKeyState(VK_SHIFT) & 0x8000) != 0);
