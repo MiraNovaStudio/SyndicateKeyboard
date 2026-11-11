@@ -34,6 +34,8 @@ private:
     void RecalculateLayoutGeometry();
     void KeepWindowOnScreen(int winW = 0, int winH = 0);
     void ShowLayoutDropdown();
+    void SetUmlautHotkeys(bool enable);
+    void OnUmlautHotkey(int id);
     int HitTestKey(int x, int y);
     bool HitTestHeader(int x, int y);
 
@@ -45,6 +47,7 @@ private:
     size_t m_activeLayoutIndex;
 
     bool m_startMinimized;
+    bool m_umlautHotkeysRegistered;
     bool m_shiftActive;
     bool m_trackingMouse;
     int m_hoveredKeyIndex;

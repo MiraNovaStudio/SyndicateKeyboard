@@ -10,6 +10,7 @@ KeyboardWindow::KeyboardWindow()
       m_hInstance(nullptr),
       m_activeLayoutIndex(0),
       m_startMinimized(false),
+      m_umlautHotkeysRegistered(false),
       m_shiftActive(false),
       m_trackingMouse(false),
       m_hoveredKeyIndex(-1),
@@ -36,6 +37,7 @@ KeyboardWindow::KeyboardWindow()
 
 
 KeyboardWindow::~KeyboardWindow() {
+    SetUmlautHotkeys(false);
     m_trayIcon.Remove();
 
     if (m_hFontTitle) DeleteObject(m_hFontTitle);
@@ -116,9 +118,11 @@ bool KeyboardWindow::Create(HINSTANCE hInstance, int nCmdShow) {
 
     if (m_startMinimized) {
         ShowWindow(m_hWnd, SW_HIDE);
+        SetUmlautHotkeys(false);
     } else {
         ShowWindow(m_hWnd, SW_SHOWNOACTIVATE);
         UpdateWindow(m_hWnd);
+        SetUmlautHotkeys(true);
     }
 
     return true;
@@ -269,6 +273,86 @@ void KeyboardWindow::KeepWindowOnScreen(int winW, int winH) {
     SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, winW, winH, SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 
+#ifndef MOD_NOREPEAT
+#define MOD_NOREPEAT 0x4000
+#endif
+
+#define IDHOT_UMLAUT_AE        4101
+#define IDHOT_UMLAUT_OE        4102
+#define IDHOT_UMLAUT_UE        4103
+#define IDHOT_UMLAUT_SS        4104
+#define IDHOT_UMLAUT_AE_SHIFT  4105
+#define IDHOT_UMLAUT_OE_SHIFT  4106
+#define IDHOT_UMLAUT_UE_SHIFT  4107
+#define IDHOT_UMLAUT_SS_SHIFT  4108
+
+struct UmlautHotkey {
+    int id;
+    UINT modifiers;
+    UINT vk;
+    wchar_t lower;
+    wchar_t upper;
+};
+
+static const UmlautHotkey kUmlautHotkeys[] = {
+    { IDHOT_UMLAUT_AE,       MOD_ALT,             'A', 0x00E4, 0x00C4 }, // ä, Ä
+    { IDHOT_UMLAUT_OE,       MOD_ALT,             'O', 0x00F6, 0x00D6 }, // ö, Ö
+    { IDHOT_UMLAUT_UE,       MOD_ALT,             'U', 0x00FC, 0x00DC }, // ü, Ü
+    { IDHOT_UMLAUT_SS,       MOD_ALT,             'S', 0x00DF, 0x1E9E }, // ß, ẞ
+    { IDHOT_UMLAUT_AE_SHIFT, MOD_ALT | MOD_SHIFT, 'A', 0x00E4, 0x00C4 },
+    { IDHOT_UMLAUT_OE_SHIFT, MOD_ALT | MOD_SHIFT, 'O', 0x00F6, 0x00D6 },
+    { IDHOT_UMLAUT_UE_SHIFT, MOD_ALT | MOD_SHIFT, 'U', 0x00FC, 0x00DC },
+    { IDHOT_UMLAUT_SS_SHIFT, MOD_ALT | MOD_SHIFT, 'S', 0x00DF, 0x1E9E },
+};
+
+void KeyboardWindow::SetUmlautHotkeys(bool enable) {
+    if (!m_hWnd || enable == m_umlautHotkeysRegistered) {
+        return;
+    }
+
+    for (const auto& hk : kUmlautHotkeys) {
+        if (enable) {
+            RegisterHotKey(m_hWnd, hk.id, hk.modifiers | MOD_NOREPEAT, hk.vk);
+        } else {
+            UnregisterHotKey(m_hWnd, hk.id);
+        }
+    }
+
+    m_umlautHotkeysRegistered = enable;
+}
+
+void KeyboardWindow::OnUmlautHotkey(int id) {
+    if (!IsVisible()) {
+        return;
+    }
+
+    const UmlautHotkey* match = nullptr;
+    for (const auto& hk : kUmlautHotkeys) {
+        if (hk.id == id) {
+            match = &hk;
+            break;
+        }
+    }
+    if (!match) {
+        return;
+    }
+
+    const bool wantUpper = m_shiftActive || (match->modifiers & MOD_SHIFT) ||
+        ((GetKeyState(VK_SHIFT) & 0x8000) != 0);
+
+    // Release Alt so the Unicode character is not treated as a menu mnemonic.
+    INPUT altUp[2] = {};
+    altUp[0].type = INPUT_KEYBOARD;
+    altUp[0].ki.wVk = VK_MENU;
+    altUp[0].ki.dwFlags = KEYEVENTF_KEYUP;
+    altUp[1].type = INPUT_KEYBOARD;
+    altUp[1].ki.wVk = VK_RMENU;
+    altUp[1].ki.dwFlags = KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP;
+    SendInput(2, altUp, sizeof(INPUT));
+
+    InputSender::SendUnicodeCharacter(wantUpper ? match->upper : match->lower);
+}
+
 void KeyboardWindow::SetLayout(size_t layoutIndex) {
     if (layoutIndex < m_layouts.size()) {
         m_activeLayoutIndex = layoutIndex;
@@ -382,11 +466,20 @@ LRESULT KeyboardWindow::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
         return 0;
     }
 
+    case WM_SHOWWINDOW:
+        SetUmlautHotkeys(wParam != FALSE);
+        return 0;
+
+    case WM_HOTKEY:
+        OnUmlautHotkey(static_cast<int>(wParam));
+        return 0;
+
     case WM_DISPLAYCHANGE:
         KeepWindowOnScreen();
         return 0;
 
     case WM_DESTROY:
+        SetUmlautHotkeys(false);
         m_trayIcon.Remove();
         PostQuitMessage(0);
         return 0;
