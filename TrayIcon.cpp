@@ -161,7 +161,7 @@ bool TrayIcon::Initialize(HWND hWnd, HINSTANCE hInstance) {
     m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     m_nid.uCallbackMessage = WM_APP_TRAY;
     m_nid.hIcon = m_hIcon;
-    wcscpy_s(m_nid.szTip, L"Syndicate Virtual Soft Keyboard");
+    wcscpy_s(m_nid.szTip, L"Syndicate Keyboard");
 
     // Try standard cbSize first
     BOOL ok = Shell_NotifyIconW(NIM_ADD, &m_nid);

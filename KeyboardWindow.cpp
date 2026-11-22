@@ -91,7 +91,7 @@ bool KeyboardWindow::Create(HINSTANCE hInstance, int nCmdShow) {
     m_hWnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         WINDOW_CLASS_NAME,
-        L"Syndicate Soft Keyboard",
+        L"Syndicate Keyboard",
         WS_POPUP,
         initX, initY,
         260, 110,
@@ -602,7 +602,7 @@ void KeyboardWindow::OnLButtonUp(int x, int y) {
     if (m_pressedHeaderBtn == 2 && PtInRect(&m_rcXBtn, pt)) {
         // X button minimizes to system tray
         ShowWindow(m_hWnd, SW_HIDE);
-        m_trayIcon.ShowBalloon(L"Syndicate Keyboard", L"Keyboard minimized to tray. Click the icon to restore, or right-click to exit.");
+        m_trayIcon.ShowBalloon(L"Syndicate Keyboard", L"Minimized to the tray. Click the icon to restore, or right-click to exit.");
     }
     m_pressedHeaderBtn = 0;
 
