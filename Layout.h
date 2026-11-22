@@ -1,3 +1,4 @@
+// (c) 2026 MiraNova Studio
 #pragma once
 #include <string>
 #include <vector>

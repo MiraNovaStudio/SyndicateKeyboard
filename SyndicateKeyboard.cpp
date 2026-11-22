@@ -1,3 +1,4 @@
+// (c) 2026 MiraNova Studio
 #include <windows.h>
 #include <commctrl.h>
 #include "KeyboardWindow.h"

@@ -1,3 +1,4 @@
+// (c) 2026 MiraNova Studio
 #include "TrayIcon.h"
 #include <cstdint>
 

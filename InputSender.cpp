@@ -1,3 +1,4 @@
+// (c) 2026 MiraNova Studio
 #include "InputSender.h"
 
 void InputSender::SendUnicodeCharacter(wchar_t ch) {

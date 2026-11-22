@@ -1,3 +1,4 @@
+// (c) 2026 MiraNova Studio
 #include "KeyboardWindow.h"
 #include "InputSender.h"
 #include "Settings.h"
