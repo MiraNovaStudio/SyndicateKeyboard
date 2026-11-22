@@ -1,1 +1,32 @@
+# Visual Studio
 .vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# MSVC intermediates and non-shipped binaries.
+# x64/Release/SyndicateKeyboard.exe is kept so people can run without building.
+x64/Debug/
+x64/Release/*
+!x64/Release/SyndicateKeyboard.exe
+x86/
+Win32/
+Syndicat.eaa90256/
+
+# Compiler / linker leftovers
+*.obj
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
+*.idb
+*.tlog
+*.log
+*.recipe
+*.lastbuildstate
+*.aps
+*.ncb
+*.opendb
+*.VC.db
+*.VC.VC.opendb
