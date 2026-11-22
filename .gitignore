@@ -5,11 +5,8 @@
 *.userosscache
 *.sln.docstates
 
-# MSVC intermediates and non-shipped binaries.
-# x64/Release/SyndicateKeyboard.exe is kept so people can run without building.
-x64/Debug/
-x64/Release/*
-!x64/Release/SyndicateKeyboard.exe
+# Build outputs and MSVC intermediates
+x64/
 x86/
 Win32/
 Syndicat.eaa90256/

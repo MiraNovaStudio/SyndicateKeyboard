@@ -12,6 +12,7 @@
 #define IDM_TRAY_HIDE             1002
 #define IDM_TRAY_EXIT             1003
 #define IDM_TRAY_START_MINIMIZED  1004
+#define IDM_TRAY_ABOUT            1005
 #define IDM_TRAY_LAYOUT_BASE      2000
 
 class TrayIcon {

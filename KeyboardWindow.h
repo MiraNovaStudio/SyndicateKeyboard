@@ -35,6 +35,7 @@ private:
     void RecalculateLayoutGeometry();
     void KeepWindowOnScreen(int winW = 0, int winH = 0);
     void ShowLayoutDropdown();
+    void ShowAbout();
     void SetUmlautHotkeys(bool enable);
     void OnUmlautHotkey(int id);
     int HitTestKey(int x, int y);

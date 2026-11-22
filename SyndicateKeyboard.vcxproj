@@ -154,6 +154,10 @@
     <ClInclude Include="Layout.h" />
     <ClInclude Include="Settings.h" />
     <ClInclude Include="TrayIcon.h" />
+    <ClInclude Include="Version.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="SyndicateKeyboard.rc" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

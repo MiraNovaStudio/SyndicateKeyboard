@@ -162,7 +162,7 @@ bool TrayIcon::Initialize(HWND hWnd, HINSTANCE hInstance) {
     m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     m_nid.uCallbackMessage = WM_APP_TRAY;
     m_nid.hIcon = m_hIcon;
-    wcscpy_s(m_nid.szTip, L"Syndicate Keyboard");
+    wcscpy_s(m_nid.szTip, L"SyndicateKeyboard");
 
     // Try standard cbSize first
     BOOL ok = Shell_NotifyIconW(NIM_ADD, &m_nid);
@@ -243,6 +243,7 @@ void TrayIcon::ShowContextMenu(HWND hWnd, const std::vector<LanguageLayout>& lay
     AppendMenuW(hMenu, startMinFlags, IDM_TRAY_START_MINIMIZED, L"Start Minimized");
 
     AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_ABOUT, L"About");
     AppendMenuW(hMenu, MF_STRING, IDM_TRAY_EXIT, L"Exit");
 
     SetForegroundWindow(hWnd);

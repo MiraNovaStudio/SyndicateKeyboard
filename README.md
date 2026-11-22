@@ -1,20 +1,10 @@
 # Syndicate Keyboard
 
+**Version 1.0**
+
 A floating virtual keyboard for Windows that types international characters into the app you are already using. It stays on top, never steals focus, and injects Unicode at the caret with Win32 `SendInput`.
 
 Built in native C++ (Win32 API). One executable, no installer, and no extra runtime beyond Windows 10 or 11.
-
-## Run
-
-A prebuilt 64-bit Release binary is included in the repository. On Windows 10 or 11, clone or download the project and double-click:
-
-```text
-x64\Release\SyndicateKeyboard.exe
-```
-
-You do not need Visual Studio to run it. Windows SmartScreen may warn on the first launch because the executable is unsigned. If you downloaded it from this repository, choose **More info** → **Run anyway**.
-
----
 
 ## Features
 
@@ -22,7 +12,7 @@ You do not need Visual Studio to run it. Windows SmartScreen may warn on the fir
 - **Always on top** and freely draggable from the header bar, including across monitors.
 - **Language dropdown** on the header (`German ▾`), with the same layouts in the tray menu.
 - **Uppercase** via the on-screen **SHIFT** toggle, the physical Shift key, or a right-click on any key. Lowercase keys show a small uppercase hint.
-- **System tray** — left-click to show or hide; right-click for layouts, **Start Minimized**, and Exit. The **X** button hides to the tray instead of quitting.
+- **System tray** — left-click to show or hide; right-click for layouts, **Start Minimized**, **About**, and Exit. The **X** button hides to the tray instead of quitting.
 - **Stays on screen** when you switch to a wider layout (for example Russian) or restore from the tray. The window is clamped to the current monitor's work area.
 - **Single instance** — launching the app again restores the existing window.
 - **Per-monitor DPI awareness (v2)** on Windows 10 and 11.
@@ -81,7 +71,7 @@ If `msbuild` is not on your PATH, use the copy under your Visual Studio install,
     SyndicateKeyboard.vcxproj -p:Configuration=Release -p:Platform=x64
 ```
 
-That overwrites `x64\Release\SyndicateKeyboard.exe`. Debug builds, PDBs, and compiler intermediate files stay on your machine and are gitignored.
+The executable is written to `x64\Release\SyndicateKeyboard.exe`. Build outputs are gitignored.
 
 ---
 
@@ -90,7 +80,7 @@ That overwrites `x64\Release\SyndicateKeyboard.exe`. Debug builds, PDBs, and com
 1. Run `x64\Release\SyndicateKeyboard.exe`. The keyboard appears in the lower right of the primary screen unless **Start Minimized** is on.
 2. Click a key to insert that character at the caret in the foreground app.
 3. Drag the header to move the window. Switch languages from the header dropdown or the tray menu.
-4. Click **X** to hide to the tray. Left-click the tray icon to show it again. Right-click the tray icon for layouts, **Start Minimized**, and **Exit**.
+4. Click **X** to hide to the tray. Left-click the tray icon to show it again. Right-click the tray icon for layouts, **Start Minimized**, **About**, and **Exit**.
 
 ---
 
@@ -110,15 +100,16 @@ When it is enabled, the next launch keeps the keyboard in the tray until you sho
 
 ```text
 SyndicateKeyboard/
+├── Version.h                # Product version (1.0)
 ├── Layout.h                 # Language and key definitions
 ├── Settings.h               # Start Minimized persistence
 ├── InputSender.h / .cpp     # Unicode injection via SendInput
 ├── TrayIcon.h / .cpp        # Notification-area icon and menu
 ├── KeyboardWindow.h / .cpp  # Floating window, hotkeys, rendering
 ├── SyndicateKeyboard.cpp    # wWinMain, DPI, single-instance mutex
+├── SyndicateKeyboard.rc     # VERSIONINFO resource
 ├── SyndicateKeyboard.slnx   # Solution
 ├── SyndicateKeyboard.vcxproj
-├── x64/Release/SyndicateKeyboard.exe  # Prebuilt binary
 └── README.md
 ```
 

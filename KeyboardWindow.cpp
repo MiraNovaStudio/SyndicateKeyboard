@@ -2,6 +2,7 @@
 #include "KeyboardWindow.h"
 #include "InputSender.h"
 #include "Settings.h"
+#include "Version.h"
 #include <algorithm>
 
 static const wchar_t* WINDOW_CLASS_NAME = L"SyndicateSoftKeyboardWindow";
@@ -459,6 +460,8 @@ LRESULT KeyboardWindow::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
         } else if (id == IDM_TRAY_START_MINIMIZED) {
             m_startMinimized = !m_startMinimized;
             Settings::SaveStartMinimized(m_startMinimized);
+        } else if (id == IDM_TRAY_ABOUT) {
+            ShowAbout();
         } else if (id == IDM_TRAY_EXIT) {
             DestroyWindow(m_hWnd);
         } else if (id >= IDM_TRAY_LAYOUT_BASE && id < IDM_TRAY_LAYOUT_BASE + m_layouts.size()) {
@@ -514,6 +517,16 @@ bool KeyboardWindow::HitTestHeader(int x, int y) {
 }
 
 #define IDM_DROPDOWN_LAYOUT_BASE 3000
+
+void KeyboardWindow::ShowAbout() {
+    const wchar_t* text =
+        L"SyndicateKeyboard\n"
+        L"Version " SYNDICATE_VERSION_STRING_W L"\n\n"
+        L"(c) 2026 MiraNova Studio";
+
+    MessageBoxW(m_hWnd, text, L"About SyndicateKeyboard",
+        MB_OK | MB_ICONINFORMATION | MB_TOPMOST | MB_SETFOREGROUND);
+}
 
 void KeyboardWindow::ShowLayoutDropdown() {
     POINT pt = { m_rcTitleBtn.left, m_rcHeader.bottom };
