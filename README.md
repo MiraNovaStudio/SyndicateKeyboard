@@ -71,13 +71,13 @@ If `msbuild` is not on your PATH, use the copy under your Visual Studio install,
     SyndicateKeyboard.vcxproj -p:Configuration=Release -p:Platform=x64
 ```
 
-The executable is written to `x64\Release\SyndicateKeyboard.exe`. Build outputs are gitignored.
+The executable is written to `x64\Release\SyndicateKeyboard-1.0.exe`. Build outputs are gitignored.
 
 ---
 
 ## Usage
 
-1. Run `x64\Release\SyndicateKeyboard.exe`. The keyboard appears in the lower right of the primary screen unless **Start Minimized** is on.
+1. Run `x64\Release\SyndicateKeyboard-1.0.exe`. The keyboard appears in the lower right of the primary screen unless **Start Minimized** is on.
 2. Click a key to insert that character at the caret in the foreground app.
 3. Drag the header to move the window. Switch languages from the header dropdown or the tray menu.
 4. Click **X** to hide to the tray. Left-click the tray icon to show it again. Right-click the tray icon for layouts, **Start Minimized**, **About**, and **Exit**.

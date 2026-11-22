@@ -23,7 +23,7 @@ BEGIN
             VALUE "FileVersion", SYNDICATE_VERSION_STRING
             VALUE "InternalName", "SyndicateKeyboard"
             VALUE "LegalCopyright", "(c) 2026 MiraNova Studio"
-            VALUE "OriginalFilename", "SyndicateKeyboard.exe"
+            VALUE "OriginalFilename", "SyndicateKeyboard-1.0.exe"
             VALUE "ProductName", "Syndicate Keyboard"
             VALUE "ProductVersion", SYNDICATE_VERSION_STRING
         END

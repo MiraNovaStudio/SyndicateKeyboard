@@ -10,4 +10,6 @@
 #define SYNDICATE_VERSION_STRING "1.0"
 #define SYNDICATE_VERSION_STRING_W L"1.0"
 
+/* Keep SyndicateVersion / TargetName in SyndicateKeyboard.vcxproj in sync. */
+
 #endif
