@@ -121,3 +121,11 @@ SyndicateKeyboard/
 ├── x64/Release/SyndicateKeyboard.exe  # Prebuilt binary
 └── README.md
 ```
+
+---
+
+## License
+
+Syndicate Keyboard is licensed under the [MIT License](LICENSE).
+
+Copyright (c) 2026 MiraNova Studio
